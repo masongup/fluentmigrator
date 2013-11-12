@@ -33,6 +33,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FluentMigrator.T4", "src\Fl
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FluentMigrator.T4.Tests", "src\FluentMigrator.T4.Tests\FluentMigrator.T4.Tests.csproj", "{A68E6543-6DB8-4AFF-A9B1-0F928B34EAA9}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FluentMigrator.T4.GenerateMigration", "src\FluentMigrator.T4.GenerateMigration\FluentMigrator.T4.GenerateMigration.csproj", "{2F19BCAB-53BC-4520-A135-2E92EF01BBB0}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		AutomatedRelease|Any CPU = AutomatedRelease|Any CPU
@@ -137,6 +139,15 @@ Global
 		{A68E6543-6DB8-4AFF-A9B1-0F928B34EAA9}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{A68E6543-6DB8-4AFF-A9B1-0F928B34EAA9}.Release|Any CPU.Build.0 = Release|Any CPU
 		{A68E6543-6DB8-4AFF-A9B1-0F928B34EAA9}.Release|x86.ActiveCfg = Release|Any CPU
+		{2F19BCAB-53BC-4520-A135-2E92EF01BBB0}.AutomatedRelease|Any CPU.ActiveCfg = Release|Any CPU
+		{2F19BCAB-53BC-4520-A135-2E92EF01BBB0}.AutomatedRelease|Any CPU.Build.0 = Release|Any CPU
+		{2F19BCAB-53BC-4520-A135-2E92EF01BBB0}.AutomatedRelease|x86.ActiveCfg = Release|Any CPU
+		{2F19BCAB-53BC-4520-A135-2E92EF01BBB0}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{2F19BCAB-53BC-4520-A135-2E92EF01BBB0}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{2F19BCAB-53BC-4520-A135-2E92EF01BBB0}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{2F19BCAB-53BC-4520-A135-2E92EF01BBB0}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{2F19BCAB-53BC-4520-A135-2E92EF01BBB0}.Release|Any CPU.Build.0 = Release|Any CPU
+		{2F19BCAB-53BC-4520-A135-2E92EF01BBB0}.Release|x86.ActiveCfg = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -152,5 +163,6 @@ Global
 		{268FEF49-78A8-490E-B4C8-1569AE6F0D8F} = {0088DBCC-C3AE-45DC-88A8-DF1E6B5AC5BC}
 		{B08E4C78-29DD-4367-8A84-35CD76971D73} = {268FEF49-78A8-490E-B4C8-1569AE6F0D8F}
 		{A68E6543-6DB8-4AFF-A9B1-0F928B34EAA9} = {268FEF49-78A8-490E-B4C8-1569AE6F0D8F}
+		{2F19BCAB-53BC-4520-A135-2E92EF01BBB0} = {268FEF49-78A8-490E-B4C8-1569AE6F0D8F}
 	EndGlobalSection
 EndGlobal

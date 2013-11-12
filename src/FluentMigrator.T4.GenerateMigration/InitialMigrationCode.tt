@@ -1,0 +1,342 @@
+﻿<#
+/*
+T4 Template for importing the DB structure for the Fluent Migration. Adapted from PetaPoco/Subsonic T4 code.
+Created by Guru Kathiresan - gururamnath  -att-   yahoo.com
+-----------------------------------------------------------------------------------------
+ 
+Features
+=========
+* Generate Intial Table structure for all support DB
+* Support for Index code generation for SQLite DB
+
+Todo
+====
+
+1) Ability to import other DB items like Triggers/Procedures/etc..
+2) Abiity add the intial setup data
+3) Generated ForeignKey code does not work for SQLite. FM problem ?
+3) Generated ForeignKey and Index code for Oracle/MSSQL/MSSQL Compact/MySQL/PGSQL
+*/
+
+#><#@ include file="FM.Core.ttinclude" #><#
+
+    // Settings
+    ConnectionStringName = "";			// Uses last connection string in config if not specified
+    Namespace = "Migrations";
+    ClassPrefix = "";
+    ClassSuffix = "";
+    IncludeViews = false;
+    
+    var generator = new CodeGenerator(ConnectionString, ProviderName, new DelegateTextWriter(x=>WriteLine(x)), s=>Warning(s));
+
+
+    // Read schema
+    var tables = generator.LoadTables();
+	foreach (Table aTable in tables)
+	{
+		var oldTable = IgnoreInfo.SingleOrDefault(t => t.Name == aTable.Name);
+		if (oldTable == null) continue;
+		foreach (Column aColumn in aTable.Columns)
+		{
+			var oldCol = oldTable.Columns.SingleOrDefault(c => c.Name == aColumn.Name);
+			if (oldCol == null) continue;
+			aColumn.Ignore = true;
+		}
+	}
+
+    // Generate output
+
+#><#
+
+if (string.IsNullOrEmpty(Namespace)) Namespace=ConnectionStringName;
+if (string.IsNullOrEmpty(Namespace)) Namespace="FluentMigration";
+#>
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Web;
+using System.Linq.Expressions;
+using FluentMigrator;
+
+namespace <#=Namespace #>
+{
+    [Migration(<#=GetCurrentTimeStamp()#>)]
+    public class CreateInitialDb<#=GetCurrentTimeStamp()#> : Migration
+    {
+<#//begin the up migration definition
+#>        public override void Up()
+        {
+<#//main loop to handle new or changed tables
+foreach(Table tbl in from t in tables where !t.Ignore select t)
+{
+//Note if the table is already present, and thus was altered, so we can change how columns are created - Alter instead of Create statements
+bool isAlter = IgnoreInfo.Any(t => t.Name == tbl.Name);
+var ColumnList = from c in tbl.Columns where !c.Ignore select c;
+if (ColumnList.Any()) //create the table if it didn't exist, and add all/missing columns
+{#>
+            //For <#=tbl.Name#>
+            <#=isAlter ? "Alter" : "Create"#>.Table("<#=tbl.Name#>")<#if (string.IsNullOrEmpty(tbl.Schema) == false ){#>.InSchema("<#=tbl.Schema#>")<#}#><#
+    
+foreach(Column col in ColumnList)
+{
+#>
+
+                .<#=isAlter ? "Add" : "With"#>Column("<#=col.Name#>").<#=generator.GetMigrationTypeFunctionForType(col)
+#><#if (col.IsPrimaryKey){#>.PrimaryKey()<#}#><#if (col.IsAutoIncrement){#>.Identity()<#}#><#if (col.IsNullable){#>.Nullable()<#} else {#>.NotNullable()<#}#><#if (col.DefaultValue != null){#>.WithDefaultValue(<#= generator.GetColumnDefaultValue(col) #>)<#}#>
+<#
+}
+#>;
+
+<#}//create the indexes for any new or changed tables
+//not currently handling indexes on pre-existing tables
+foreach(TableIndex indx in tbl.Indexes)
+{
+#>
+            Create.Index("<#=indx.Name#>").OnTable("<#=tbl.Name#>")<#if (string.IsNullOrEmpty(tbl.Schema) == false ){#>.InSchema("<#=tbl.Schema#>")<#}#>
+<#
+foreach(IndexColumn col in indx.IndexColumns)
+{
+#>
+
+                .OnColumn("<#=col.Name#>")<#if (col.IsAsc){#>.Ascending()<#}else{#>.Descending()<#}#>
+<#
+}
+#><#if (indx.IsUnique){
+#>
+
+                .WithOptions().Unique()<#}#>;
+<#
+}
+//if the table was pre-existing, delete any columns that were deleted, along with their foreign keys, if any
+if (isAlter)
+{
+	foreach (var deleteColumn in IgnoreInfo.Single(t => t.Name == tbl.Name).Columns.Where(c => !tbl.Columns.Any(col => col.Name == c.Name)))
+	{
+		ForeignKey columnForeignKey = IgnoreInfo.Single(t => t.Name == tbl.Name).ForeignKeys.FirstOrDefault(fk => fk.PrimaryColumns.Any(pc => pc == deleteColumn.Name));
+		if (columnForeignKey != null)
+		{
+#>
+            Delete.ForeignKey("<#=columnForeignKey.Name#>").OnTable("<#=tbl.Name#>").InSchema("dbo"); 
+<#
+		}
+#>
+			Delete.Column("<#=deleteColumn.Name#>").FromTable("<#=tbl.Name#>").InSchema("dbo");
+<#
+	}
+}
+}
+#>
+
+<#
+bool commentAlreadyWritten = false;
+//handle added foreign keys
+foreach(Table tbl in from t in tables where !t.Ignore select t)
+{
+Table otherTable = IgnoreInfo.SingleOrDefault(ot => ot.Name == tbl.Name);
+List<ForeignKey> FKeyList = tbl.ForeignKeys;
+if (otherTable != null) //if the table is pre-existing, filter out any foreign keys that were already present
+{
+    FKeyList = FKeyList.Where(nfk => otherTable.ForeignKeys.All(ofk => ofk.Name != nfk.Name)).ToList();
+}
+foreach(ForeignKey fkey in FKeyList)
+{
+#>
+           <# if(commentAlreadyWritten == false) { #> //Foreign Key List <# commentAlreadyWritten = true;} #>
+           Create.<# 
+    if(!string.IsNullOrEmpty(fkey.Name)) 
+    { 
+        #>ForeignKey("<#=fkey.Name#>")<# 
+    } #>.FromTable("<#=tbl.Name#>").InSchema("<#=fkey.ForeignTableSchema#>").ForeignColumns(<#=Join(fkey.ForeignColumns)#>).ToTable("<#=fkey.PrimaryTable#>").InSchema("<#=fkey.PrimaryTableSchema#>").PrimaryColumns(<#=Join(fkey.PrimaryColumns)#>)<#=generator.GetUpdateDeleteRule(fkey)#>;
+        <#
+}
+}
+//for removed tables, remove the foreign keys, indexes, and tables themselves
+foreach (Table removedTable in IgnoreInfo.Where(t => tables.All(tbl => tbl.Name != t.Name)))
+{
+foreach(ForeignKey fkey in removedTable.ForeignKeys)
+    {
+if(!string.IsNullOrEmpty(fkey.Name)){
+#>
+            Delete.ForeignKey("<#=fkey.Name#>").OnTable("<#=removedTable.Name#>")<#if (string.IsNullOrEmpty(removedTable.Schema) == false ){#>.InSchema("<#=removedTable.Schema#>")<#}#>; 
+<#
+        } else {
+        #>
+            Delete.ForeignKey().FromTable("<#=removedTable.Name#>").InSchema("<#=fkey.ForeignTableSchema#>").ForeignColumns(<#=Join(fkey.ForeignColumns)#>).ToTable("<#=fkey.PrimaryTable#>")/*.InSchema("<#=fkey.PrimaryTableSchema#>")*/.PrimaryColumns(<#=Join(fkey.PrimaryColumns)#>);
+<#
+        }
+    }
+
+	foreach(TableIndex idx in removedTable.Indexes)
+    {
+#>
+            Delete.Index("<#=idx.Name#>").OnTable("<#=removedTable.Name#>")<#if (string.IsNullOrEmpty(removedTable.Schema) == false ){#>.InSchema("<#=removedTable.Schema#>")<#}#>;
+<#
+    }
+
+#>
+            Delete.Table("<#=removedTable.Name#>");
+<#
+} //Begin writing the Down migration
+#>
+        }
+		
+        public override void Down()
+        {
+<#
+var DeleteTableList = tables.Where(tbl => IgnoreInfo.All(t => t.Name != tbl.Name)).ToArray();
+//Handle removing foreign keys generated in added tables, and add and delete foreign keys for changed tables
+foreach(Table tbl in tables)
+{
+    Table otherTable = IgnoreInfo.SingleOrDefault(ot => ot.Name == tbl.Name);
+	List<ForeignKey> FKeyList = tbl.ForeignKeys;
+	if (otherTable != null)
+	{
+		FKeyList = FKeyList.Where(nfk => otherTable.ForeignKeys.All(ofk => ofk.Name != nfk.Name)).ToList();
+
+		var addFKeyList = otherTable.ForeignKeys.Where(ofk => tbl.ForeignKeys.All(nfk => nfk.Name != ofk.Name)).ToList();
+		foreach (ForeignKey addKey in addFKeyList)
+		{
+		#>
+           Create.<# 
+    if(!string.IsNullOrEmpty(addKey.Name)) 
+    { 
+        #>ForeignKey("<#=addKey.Name#>")<# 
+    } #>.FromTable("<#=tbl.Name#>").InSchema("<#=addKey.ForeignTableSchema#>").ForeignColumns(<#=Join(addKey.ForeignColumns)#>).ToTable("<#=addKey.PrimaryTable#>").InSchema("<#=addKey.PrimaryTableSchema#>").PrimaryColumns(<#=Join(addKey.PrimaryColumns)#>)<#=generator.GetUpdateDeleteRule(addKey)#>;
+        <#
+		}
+	}
+    foreach(ForeignKey fkey in FKeyList)
+    {
+if(!string.IsNullOrEmpty(fkey.Name)){
+#>
+            Delete.ForeignKey("<#=fkey.Name#>").OnTable("<#=tbl.Name#>")<#if (string.IsNullOrEmpty(tbl.Schema) == false ){#>.InSchema("<#=tbl.Schema#>")<#}#>; 
+<#
+        } else {
+        #>
+            Delete.ForeignKey().FromTable("<#=tbl.Name#>").InSchema("<#=fkey.ForeignTableSchema#>").ForeignColumns(<#=Join(fkey.ForeignColumns)#>).ToTable("<#=fkey.PrimaryTable#>")/*.InSchema("<#=fkey.PrimaryTableSchema#>")*/.PrimaryColumns(<#=Join(fkey.PrimaryColumns)#>);
+<#
+        }
+    }
+}
+#>
+
+<#
+//delete added tables
+foreach(Table tbl in DeleteTableList)
+{
+	foreach(TableIndex idx in from i in tbl.Indexes select i)
+    {
+#>
+            Delete.Index("<#=idx.Name#>").OnTable("<#=tbl.Name#>")<#if (string.IsNullOrEmpty(tbl.Schema) == false ){#>.InSchema("<#=tbl.Schema#>")<#}#>;
+<#
+    }
+}
+#>
+
+<#
+DeleteTableList = DeleteTableList.Reverse().ToArray();
+foreach(Table tbl in DeleteTableList)
+{
+#>
+            Delete.Table("<#=tbl.Name#>");
+<#
+}
+#>
+
+<#
+//for shared tables, delete and add columns
+foreach (Table afterTable in tables.Where(nt => IgnoreInfo.Any(ot => ot.Name == nt.Name)))
+{
+    Table beforeTable = IgnoreInfo.Single(ot => ot.Name == afterTable.Name);
+
+	var colsToAdd = beforeTable.Columns.Where(bc => afterTable.Columns.All(ac => ac.Name != bc.Name)).ToArray();
+	if (colsToAdd.Any())
+	{
+#>
+            Alter.Table("<#=afterTable.Name#>").InSchema("dbo")<#
+		foreach (Column newCol in colsToAdd)
+		{
+#>
+
+                .AddColumn("<#=newCol.Name#>").<#=generator.GetMigrationTypeFunctionForType(newCol)
+#><#if (newCol.IsPrimaryKey){#>.PrimaryKey()<#}#><#if (newCol.IsAutoIncrement){#>.Identity()<#}#><#if (newCol.IsNullable){#>.Nullable()<#} else {#>.NotNullable()<#}#><#if (newCol.DefaultValue != null){#>.WithDefaultValue(<#= generator.GetColumnDefaultValue(newCol) #>)<#}#>
+<#
+		}
+#>;
+
+<#
+	}
+#>
+<#
+	foreach (Column oldCol in afterTable.Columns.Where(ac => beforeTable.Columns.All(bc => bc.Name != ac.Name)))
+	{
+#>
+			Delete.Column("<#=oldCol.Name#>").FromTable("<#=afterTable.Name#>").InSchema("dbo");
+<#
+	}
+#>
+<#
+}
+#>
+
+<#	//create tables that were deleted in the up migration
+	foreach (Table oldTable in IgnoreInfo.Where(ot => tables.All(nt => nt.Name != ot.Name)))
+	{
+#>
+            Create.Table("<#=oldTable.Name#>")<#if (string.IsNullOrEmpty(oldTable.Schema) == false ){#>.InSchema("<#=oldTable.Schema#>")<#}#><#
+    var ColumnList = from c in oldTable.Columns where !c.Ignore select c;
+foreach(Column col in ColumnList)
+{
+#>
+
+                .WithColumn("<#=col.Name#>").<#=generator.GetMigrationTypeFunctionForType(col)
+#><#if (col.IsPrimaryKey){#>.PrimaryKey()<#}#><#if (col.IsAutoIncrement){#>.Identity()<#}#><#if (col.IsNullable){#>.Nullable()<#} else {#>.NotNullable()<#}#><#if (col.DefaultValue != null){#>.WithDefaultValue(<#= generator.GetColumnDefaultValue(col) #>)<#}#>
+<#
+}
+#>;
+
+<#
+    List<TableIndex> IndexList = oldTable.Indexes;
+foreach(TableIndex indx in IndexList)
+{
+#>
+            Create.Index("<#=indx.Name#>").OnTable("<#=oldTable.Name#>")<#if (string.IsNullOrEmpty(oldTable.Schema) == false ){#>.InSchema("<#=oldTable.Schema#>")<#}#>
+<#
+foreach(IndexColumn col in indx.IndexColumns)
+{
+#>
+
+                .OnColumn("<#=col.Name#>")<#if (col.IsAsc){#>.Ascending()<#}else{#>.Descending()<#}#>
+<#
+}
+#><#if (indx.IsUnique){
+#>
+
+                .WithOptions().Unique()<#}#>;
+<#
+}
+#>
+			
+<#
+	}
+
+	//create foreign keys for deleted tables
+	foreach(Table oldTable in IgnoreInfo.Where(ot => tables.All(nt => nt.Name != ot.Name)))
+{
+    foreach(ForeignKey fkey in oldTable.ForeignKeys)
+{
+#>
+           Create.<# 
+    if(!string.IsNullOrEmpty(fkey.Name)) 
+    { 
+        #>ForeignKey("<#=fkey.Name#>")<# 
+    } #>.FromTable("<#=oldTable.Name#>").InSchema("<#=fkey.ForeignTableSchema#>").ForeignColumns(<#=Join(fkey.ForeignColumns)#>).ToTable("<#=fkey.PrimaryTable#>").InSchema("<#=fkey.PrimaryTableSchema#>").PrimaryColumns(<#=Join(fkey.PrimaryColumns)#>)<#=generator.GetUpdateDeleteRule(fkey)#>;
+        <#
+}
+}
+#>
+        }
+    }
+}
+
+
