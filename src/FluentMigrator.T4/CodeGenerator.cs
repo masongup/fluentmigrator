@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Data;
 using System.Data.Common;
 using System.IO;
 using System.Linq;
@@ -47,48 +48,71 @@ namespace FluentMigrator.T4
 
         public string GetColumnDefaultValue(Column col)
         {
-            string sysType = string.Format("\"{0}\"", col.DefaultValue);
+            string sysType = null;
+            if (col.DefaultValue != null)
+                sysType = string.Format(".WithDefaultValue(\"{0}\")", col.DefaultValue);
+
             var guid = Guid.Empty;
             switch (col.PropertyType)
             {
-                case System.Data.DbType.Byte:
-                case System.Data.DbType.Currency:
-                case System.Data.DbType.Decimal:
-                case System.Data.DbType.Double:
-                case System.Data.DbType.Boolean:
-                case System.Data.DbType.Int16:
-                case System.Data.DbType.Int32:
-                case System.Data.DbType.Int64:
-                case System.Data.DbType.Single:
-                case System.Data.DbType.UInt16:
-                case System.Data.DbType.UInt32:
-                case System.Data.DbType.UInt64:
-                    sysType = col.DefaultValue.Replace("'", "").Replace("\"", "").CleanBracket();
+                case DbType.Byte:
+                case DbType.Currency:
+                case DbType.Decimal:
+                case DbType.Double:
+                case DbType.Int16:
+                case DbType.Int32:
+                case DbType.Int64:
+                case DbType.Single:
+                case DbType.UInt16:
+                case DbType.UInt32:
+                case DbType.UInt64:
+                    if (col.DefaultValue != null)
+                        sysType = ".WithDefaultValue(" + col.DefaultValue.Replace("'", "").Replace("\"", "").CleanBracket() + ")";
+                    else
+                        sysType = ".WithDefaultValue(0)";
                     break;
-                case System.Data.DbType.Guid:
-                    if (col.DefaultValue.IsGuid(out guid))
+                case DbType.Guid:
+                    if (col.DefaultValue != null)
                     {
-                        if (guid == Guid.Empty)
-                            sysType = "Guid.Empty";
-                        else
-                            sysType = string.Format("new System.Guid(\"{0}\")", guid);                        
+                        if (col.DefaultValue.IsGuid(out guid))
+                        {
+                            if (guid == Guid.Empty)
+                                sysType = ".WithDefaultValue(Guid.Empty)";
+                            else
+                                sysType = ".WithDefaultValue(new System.Guid(\"" + guid + "\"))";
+                        }
                     }
+                    else
+                        sysType = ".WithDefault(SystemMethods.NewGuid)";
                     break;
-                case System.Data.DbType.DateTime:
-                case System.Data.DbType.DateTime2:
-                case System.Data.DbType.Date:
+                case DbType.DateTime:
+                case DbType.DateTime2:
+                case DbType.Date:
                     if (col.DefaultValue.ToLower() == "current_time"
                         || col.DefaultValue.ToLower() == "current_date"
                         || col.DefaultValue.ToLower() == "current_timestamp")
                     {
-                        sysType = "SystemMethods.CurrentDateTime";
+                        sysType = ".WithDefault(SystemMethods.CurrentDateTime)";
                     }
                     else
                     {
-                        sysType = "\"" + col.DefaultValue.CleanBracket() + "\"";
+                        sysType = ".WithDefaultValue(\"" + col.DefaultValue.CleanBracket() + "\")";
                     }
                     break;
-                default:
+                case DbType.Boolean:
+                    if (col.DefaultValue != null)
+                        sysType = ".WithDefaultValue(" + col.DefaultValue.Replace("'", "").Replace("\"", "").CleanBracket() + ")";
+                    else
+                        sysType = ".WithDefaultValue(false)";
+                    break;
+                case DbType.AnsiString:
+                case DbType.AnsiStringFixedLength:
+                case DbType.String:
+                case DbType.StringFixedLength:
+                    if (col.DefaultValue != null)
+                        sysType = ".WithDefaultValue(" + col.DefaultValue + "\")";
+                    else
+                        sysType = ".WithDefault(SystemMethods.NewGuid)";
                     break;
             }
 

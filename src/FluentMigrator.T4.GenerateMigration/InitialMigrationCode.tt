@@ -82,7 +82,8 @@ foreach(Column col in ColumnList)
 #>
 
                 .<#=isAlter ? "Add" : "With"#>Column("<#=col.Name#>").<#=generator.GetMigrationTypeFunctionForType(col)
-#><#if (col.IsPrimaryKey){#>.PrimaryKey()<#}#><#if (col.IsAutoIncrement){#>.Identity()<#}#><#if (col.IsNullable){#>.Nullable()<#} else {#>.NotNullable()<#}#><#if (col.DefaultValue != null){#>.WithDefaultValue(<#= generator.GetColumnDefaultValue(col) #>)<#}#>
+#><#if (col.IsPrimaryKey){#>.PrimaryKey()<#}#><#if (col.IsAutoIncrement){#>.Identity()<#}#><#if (col.IsNullable){#>.Nullable()<#} 
+else {#>.NotNullable()<#}#><#if (col.DefaultValue != null || (!col.IsNullable && isAlter)){#><#= generator.GetColumnDefaultValue(col) #><#}#>
 <#
 }
 #>;
@@ -141,7 +142,7 @@ if (otherTable != null) //if the table is pre-existing, filter out any foreign k
 foreach(ForeignKey fkey in FKeyList)
 {
 #>
-           <# if(commentAlreadyWritten == false) { #>//Foreign Key List
+<# if(commentAlreadyWritten == false) { #>           //Foreign Key List
 		   
 <# commentAlreadyWritten = true;} #>
            Create.<# 
@@ -261,7 +262,8 @@ foreach (Table afterTable in tables.Where(nt => IgnoreInfo.Any(ot => ot.Name == 
 #>
 
                 .AddColumn("<#=newCol.Name#>").<#=generator.GetMigrationTypeFunctionForType(newCol)
-#><#if (newCol.IsPrimaryKey){#>.PrimaryKey()<#}#><#if (newCol.IsAutoIncrement){#>.Identity()<#}#><#if (newCol.IsNullable){#>.Nullable()<#} else {#>.NotNullable()<#}#><#if (newCol.DefaultValue != null){#>.WithDefaultValue(<#= generator.GetColumnDefaultValue(newCol) #>)<#}#>
+#><#if (newCol.IsPrimaryKey){#>.PrimaryKey()<#}#><#if (newCol.IsAutoIncrement){#>.Identity()<#}#><#if (newCol.IsNullable){#>.Nullable()<#}
+else {#>.NotNullable()<#}#><#if (newCol.DefaultValue != null || !newCol.IsNullable){#><#= generator.GetColumnDefaultValue(newCol) #><#}#>
 <#
 		}
 #>;
@@ -292,7 +294,8 @@ foreach(Column col in ColumnList)
 #>
 
                 .WithColumn("<#=col.Name#>").<#=generator.GetMigrationTypeFunctionForType(col)
-#><#if (col.IsPrimaryKey){#>.PrimaryKey()<#}#><#if (col.IsAutoIncrement){#>.Identity()<#}#><#if (col.IsNullable){#>.Nullable()<#} else {#>.NotNullable()<#}#><#if (col.DefaultValue != null){#>.WithDefaultValue(<#= generator.GetColumnDefaultValue(col) #>)<#}#>
+#><#if (col.IsPrimaryKey){#>.PrimaryKey()<#}#><#if (col.IsAutoIncrement){#>.Identity()<#}#><#if (col.IsNullable){#>.Nullable()<#}
+else {#>.NotNullable()<#}#><#if (col.DefaultValue != null){#><#= generator.GetColumnDefaultValue(col) #><#}#>
 <#
 }
 #>;
