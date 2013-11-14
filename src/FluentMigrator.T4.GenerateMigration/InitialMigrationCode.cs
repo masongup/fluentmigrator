@@ -119,14 +119,14 @@ if (string.IsNullOrEmpty(Namespace)) Namespace="FluentMigration";
             this.Write("\r\n{\r\n    [Migration(");
             
             #line 63 "C:\SalusSource\SmithBurgess\Development\Model\Src\Migration\NativeMigration\fluentmigrator\src\FluentMigrator.T4.GenerateMigration\InitialMigrationCode.tt"
-            this.Write(this.ToStringHelper.ToStringWithCulture(GetCurrentVersionString()));
+            this.Write(this.ToStringHelper.ToStringWithCulture(GetCurrentTimeStamp()));
             
             #line default
             #line hidden
             this.Write(")]\r\n    public class CreateInitialDb");
             
             #line 64 "C:\SalusSource\SmithBurgess\Development\Model\Src\Migration\NativeMigration\fluentmigrator\src\FluentMigrator.T4.GenerateMigration\InitialMigrationCode.tt"
-            this.Write(this.ToStringHelper.ToStringWithCulture(ClassString));
+            this.Write(this.ToStringHelper.ToStringWithCulture(GetCurrentTimeStamp()));
             
             #line default
             #line hidden
@@ -1722,13 +1722,11 @@ public string ProviderName
 
 public Tables IgnoreInfo { get; set; }
 
-public string VersionString { get; set; }
+private string _timeStamp;
 
-public string ClassString { get; set; }
-
-public string GetCurrentVersionString()
+public string GetCurrentTimeStamp()
 {
-    return VersionString ?? (VersionString = DateTime.Now.ToString("yyyyMMddhhmmss"));
+    return _timeStamp ?? (_timeStamp = DateTime.Now.ToString("yyyyMMddhhmmss"));
 }
 
     public string Join(IEnumerable<string> list)
