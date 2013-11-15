@@ -92,6 +92,9 @@ namespace FluentMigrator.Runner.Initialization
                     case "listmigrations":
                         Runner.ListMigrations();
                         break;
+                    case "showlatest":
+                        Runner.ShowLatest();
+                        break;
                 }
             }
             finally { Runner.Processor.Dispose(); }

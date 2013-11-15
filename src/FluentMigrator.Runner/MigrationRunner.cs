@@ -155,6 +155,11 @@ namespace FluentMigrator.Runner
             return migrations.Where(m => m.Key > newestAppliedMigration && m.Key <= version).Select(m => m.Value);
         }
 
+        public void ShowLatest()
+        {
+            _announcer.Say(VersionLoader.VersionInfo.Latest().ToString());
+        }
+
         private bool IsMigrationStepNeededForUpMigration(long versionOfMigration, long targetVersion)
         {
             if (versionOfMigration <= targetVersion && !VersionLoader.VersionInfo.HasAppliedMigration(versionOfMigration))
