@@ -145,7 +145,7 @@ if (string.IsNullOrEmpty(Namespace)) Namespace="FluentMigration";
 foreach(Table tbl in from t in tables where !t.Ignore select t)
 {
 //Note if the table is already present, and thus was altered, so we can change how columns are created - Alter instead of Create statements
-bool isAlter = IgnoreInfo.Any(t => t.Name == tbl.Name);
+Table alterTable = IgnoreInfo.SingleOrDefault(t => t.Name == tbl.Name);
 var ColumnList = from c in tbl.Columns where !c.Ignore select c;
 if (ColumnList.Any()) //create the table if it didn't exist, and add all/missing columns
 {
@@ -162,7 +162,7 @@ if (ColumnList.Any()) //create the table if it didn't exist, and add all/missing
             this.Write("\r\n            ");
             
             #line 78 "C:\SalusSource\SmithBurgess\Development\Model\Src\Migration\NativeMigration\fluentmigrator\src\FluentMigrator.T4.GenerateMigration\InitialMigrationCode.tt"
-            this.Write(this.ToStringHelper.ToStringWithCulture(isAlter ? "Alter" : "Create"));
+            this.Write(this.ToStringHelper.ToStringWithCulture(alterTable != null ? "Alter" : "Create"));
             
             #line default
             #line hidden
@@ -207,7 +207,7 @@ foreach(Column col in ColumnList)
             this.Write("\r\n                .");
             
             #line 84 "C:\SalusSource\SmithBurgess\Development\Model\Src\Migration\NativeMigration\fluentmigrator\src\FluentMigrator.T4.GenerateMigration\InitialMigrationCode.tt"
-            this.Write(this.ToStringHelper.ToStringWithCulture(isAlter ? "Add" : "With"));
+            this.Write(this.ToStringHelper.ToStringWithCulture(alterTable != null ? "Add" : "With"));
             
             #line default
             #line hidden
@@ -274,7 +274,7 @@ else {
             #line hidden
             
             #line 86 "C:\SalusSource\SmithBurgess\Development\Model\Src\Migration\NativeMigration\fluentmigrator\src\FluentMigrator.T4.GenerateMigration\InitialMigrationCode.tt"
-if (col.DefaultValue != null || (!col.IsNullable && isAlter)){
+if (col.DefaultValue != null || (!col.IsNullable && alterTable != null)){
             
             #line default
             #line hidden
@@ -409,36 +409,57 @@ if (indx.IsUnique){
 
 }
 //if the table was pre-existing, delete any columns that were deleted, along with their foreign keys, if any
-if (isAlter)
+if (alterTable != null)
 {
-	foreach (var deleteColumn in IgnoreInfo.Single(t => t.Name == tbl.Name).Columns.Where(c => !tbl.Columns.Any(col => col.Name == c.Name)))
+	foreach (var deletedForeignKey in alterTable.ForeignKeys.Where(fk => tbl.ForeignKeys.All(ofk => ofk.Name != fk.Name)))
 	{
-		ForeignKey columnForeignKey = IgnoreInfo.Single(t => t.Name == tbl.Name).ForeignKeys.FirstOrDefault(fk => fk.PrimaryColumns.Any(pc => pc == deleteColumn.Name));
-		if (columnForeignKey != null)
-		{
 
             
             #line default
             #line hidden
             this.Write("            Delete.ForeignKey(\"");
             
-            #line 120 "C:\SalusSource\SmithBurgess\Development\Model\Src\Migration\NativeMigration\fluentmigrator\src\FluentMigrator.T4.GenerateMigration\InitialMigrationCode.tt"
-            this.Write(this.ToStringHelper.ToStringWithCulture(columnForeignKey.Name));
+            #line 117 "C:\SalusSource\SmithBurgess\Development\Model\Src\Migration\NativeMigration\fluentmigrator\src\FluentMigrator.T4.GenerateMigration\InitialMigrationCode.tt"
+            this.Write(this.ToStringHelper.ToStringWithCulture(deletedForeignKey.Name));
             
             #line default
             #line hidden
             this.Write("\").OnTable(\"");
             
-            #line 120 "C:\SalusSource\SmithBurgess\Development\Model\Src\Migration\NativeMigration\fluentmigrator\src\FluentMigrator.T4.GenerateMigration\InitialMigrationCode.tt"
+            #line 117 "C:\SalusSource\SmithBurgess\Development\Model\Src\Migration\NativeMigration\fluentmigrator\src\FluentMigrator.T4.GenerateMigration\InitialMigrationCode.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(tbl.Name));
             
             #line default
             #line hidden
-            this.Write("\").InSchema(\"dbo\"); \r\n");
+            this.Write("\")");
             
-            #line 121 "C:\SalusSource\SmithBurgess\Development\Model\Src\Migration\NativeMigration\fluentmigrator\src\FluentMigrator.T4.GenerateMigration\InitialMigrationCode.tt"
+            #line 117 "C:\SalusSource\SmithBurgess\Development\Model\Src\Migration\NativeMigration\fluentmigrator\src\FluentMigrator.T4.GenerateMigration\InitialMigrationCode.tt"
+if (string.IsNullOrEmpty(tbl.Schema) == false ){
+            
+            #line default
+            #line hidden
+            this.Write(".InSchema(\"");
+            
+            #line 117 "C:\SalusSource\SmithBurgess\Development\Model\Src\Migration\NativeMigration\fluentmigrator\src\FluentMigrator.T4.GenerateMigration\InitialMigrationCode.tt"
+            this.Write(this.ToStringHelper.ToStringWithCulture(tbl.Schema));
+            
+            #line default
+            #line hidden
+            this.Write("\")");
+            
+            #line 117 "C:\SalusSource\SmithBurgess\Development\Model\Src\Migration\NativeMigration\fluentmigrator\src\FluentMigrator.T4.GenerateMigration\InitialMigrationCode.tt"
+}
+            
+            #line default
+            #line hidden
+            this.Write("; \r\n");
+            
+            #line 118 "C:\SalusSource\SmithBurgess\Development\Model\Src\Migration\NativeMigration\fluentmigrator\src\FluentMigrator.T4.GenerateMigration\InitialMigrationCode.tt"
 
-		}
+	}
+	
+	foreach (var deleteColumn in alterTable.Columns.Where(c => !tbl.Columns.Any(col => col.Name == c.Name)))
+	{
 
             
             #line default
@@ -457,7 +478,28 @@ if (isAlter)
             
             #line default
             #line hidden
-            this.Write("\").InSchema(\"dbo\");\r\n");
+            this.Write("\")");
+            
+            #line 124 "C:\SalusSource\SmithBurgess\Development\Model\Src\Migration\NativeMigration\fluentmigrator\src\FluentMigrator.T4.GenerateMigration\InitialMigrationCode.tt"
+if (string.IsNullOrEmpty(tbl.Schema) == false ){
+            
+            #line default
+            #line hidden
+            this.Write(".InSchema(\"");
+            
+            #line 124 "C:\SalusSource\SmithBurgess\Development\Model\Src\Migration\NativeMigration\fluentmigrator\src\FluentMigrator.T4.GenerateMigration\InitialMigrationCode.tt"
+            this.Write(this.ToStringHelper.ToStringWithCulture(tbl.Schema));
+            
+            #line default
+            #line hidden
+            this.Write("\")");
+            
+            #line 124 "C:\SalusSource\SmithBurgess\Development\Model\Src\Migration\NativeMigration\fluentmigrator\src\FluentMigrator.T4.GenerateMigration\InitialMigrationCode.tt"
+}
+            
+            #line default
+            #line hidden
+            this.Write(";\r\n");
             
             #line 125 "C:\SalusSource\SmithBurgess\Development\Model\Src\Migration\NativeMigration\fluentmigrator\src\FluentMigrator.T4.GenerateMigration\InitialMigrationCode.tt"
 
@@ -494,14 +536,14 @@ foreach(ForeignKey fkey in FKeyList)
             
             #line default
             #line hidden
-            this.Write("           //Foreign Key List\r\n\t\t   \r\n");
+            this.Write("            //Foreign Key List\r\n\t\t   \r\n");
             
             #line 147 "C:\SalusSource\SmithBurgess\Development\Model\Src\Migration\NativeMigration\fluentmigrator\src\FluentMigrator.T4.GenerateMigration\InitialMigrationCode.tt"
  commentAlreadyWritten = true;} 
             
             #line default
             #line hidden
-            this.Write("           Create.");
+            this.Write("            Create.");
             
             #line 148 "C:\SalusSource\SmithBurgess\Development\Model\Src\Migration\NativeMigration\fluentmigrator\src\FluentMigrator.T4.GenerateMigration\InitialMigrationCode.tt"
  
@@ -772,7 +814,7 @@ foreach(Table tbl in tables)
             
             #line default
             #line hidden
-            this.Write("           Create.");
+            this.Write("            Create.");
             
             #line 203 "C:\SalusSource\SmithBurgess\Development\Model\Src\Migration\NativeMigration\fluentmigrator\src\FluentMigrator.T4.GenerateMigration\InitialMigrationCode.tt"
  
@@ -846,7 +888,7 @@ foreach(Table tbl in tables)
             
             #line default
             #line hidden
-            this.Write(";\r\n        ");
+            this.Write(";\r\n");
             
             #line 208 "C:\SalusSource\SmithBurgess\Development\Model\Src\Migration\NativeMigration\fluentmigrator\src\FluentMigrator.T4.GenerateMigration\InitialMigrationCode.tt"
 

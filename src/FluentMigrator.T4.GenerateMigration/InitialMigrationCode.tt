@@ -70,20 +70,20 @@ namespace <#=Namespace #>
 foreach(Table tbl in from t in tables where !t.Ignore select t)
 {
 //Note if the table is already present, and thus was altered, so we can change how columns are created - Alter instead of Create statements
-bool isAlter = IgnoreInfo.Any(t => t.Name == tbl.Name);
+Table alterTable = IgnoreInfo.SingleOrDefault(t => t.Name == tbl.Name);
 var ColumnList = from c in tbl.Columns where !c.Ignore select c;
 if (ColumnList.Any()) //create the table if it didn't exist, and add all/missing columns
 {#>
             //For <#=tbl.Name#>
-            <#=isAlter ? "Alter" : "Create"#>.Table("<#=tbl.Name#>")<#if (string.IsNullOrEmpty(tbl.Schema) == false ){#>.InSchema("<#=tbl.Schema#>")<#}#><#
+            <#=alterTable != null ? "Alter" : "Create"#>.Table("<#=tbl.Name#>")<#if (string.IsNullOrEmpty(tbl.Schema) == false ){#>.InSchema("<#=tbl.Schema#>")<#}#><#
     
 foreach(Column col in ColumnList)
 {
 #>
 
-                .<#=isAlter ? "Add" : "With"#>Column("<#=col.Name#>").<#=generator.GetMigrationTypeFunctionForType(col)
+                .<#=alterTable != null ? "Add" : "With"#>Column("<#=col.Name#>").<#=generator.GetMigrationTypeFunctionForType(col)
 #><#if (col.IsPrimaryKey){#>.PrimaryKey()<#}#><#if (col.IsAutoIncrement){#>.Identity()<#}#><#if (col.IsNullable){#>.Nullable()<#} 
-else {#>.NotNullable()<#}#><#if (col.DefaultValue != null || (!col.IsNullable && isAlter)){#><#= generator.GetColumnDefaultValue(col) #><#}#>
+else {#>.NotNullable()<#}#><#if (col.DefaultValue != null || (!col.IsNullable && alterTable != null)){#><#= generator.GetColumnDefaultValue(col) #><#}#>
 <#
 }
 #>;
@@ -109,19 +109,19 @@ foreach(IndexColumn col in indx.IndexColumns)
 <#
 }
 //if the table was pre-existing, delete any columns that were deleted, along with their foreign keys, if any
-if (isAlter)
+if (alterTable != null)
 {
-	foreach (var deleteColumn in IgnoreInfo.Single(t => t.Name == tbl.Name).Columns.Where(c => !tbl.Columns.Any(col => col.Name == c.Name)))
+	foreach (var deletedForeignKey in alterTable.ForeignKeys.Where(fk => tbl.ForeignKeys.All(ofk => ofk.Name != fk.Name)))
 	{
-		ForeignKey columnForeignKey = IgnoreInfo.Single(t => t.Name == tbl.Name).ForeignKeys.FirstOrDefault(fk => fk.PrimaryColumns.Any(pc => pc == deleteColumn.Name));
-		if (columnForeignKey != null)
-		{
 #>
-            Delete.ForeignKey("<#=columnForeignKey.Name#>").OnTable("<#=tbl.Name#>").InSchema("dbo"); 
+            Delete.ForeignKey("<#=deletedForeignKey.Name#>").OnTable("<#=tbl.Name#>")<#if (string.IsNullOrEmpty(tbl.Schema) == false ){#>.InSchema("<#=tbl.Schema#>")<#}#>; 
 <#
-		}
+	}
+	
+	foreach (var deleteColumn in alterTable.Columns.Where(c => !tbl.Columns.Any(col => col.Name == c.Name)))
+	{
 #>
-			Delete.Column("<#=deleteColumn.Name#>").FromTable("<#=tbl.Name#>").InSchema("dbo");
+			Delete.Column("<#=deleteColumn.Name#>").FromTable("<#=tbl.Name#>")<#if (string.IsNullOrEmpty(tbl.Schema) == false ){#>.InSchema("<#=tbl.Schema#>")<#}#>;
 <#
 	}
 }
@@ -142,10 +142,10 @@ if (otherTable != null) //if the table is pre-existing, filter out any foreign k
 foreach(ForeignKey fkey in FKeyList)
 {
 #>
-<# if(commentAlreadyWritten == false) { #>           //Foreign Key List
+<# if(commentAlreadyWritten == false) { #>            //Foreign Key List
 		   
 <# commentAlreadyWritten = true;} #>
-           Create.<# 
+            Create.<# 
     if(!string.IsNullOrEmpty(fkey.Name)) 
     { 
         #>ForeignKey("<#=fkey.Name#>")<# 
@@ -200,12 +200,12 @@ foreach(Table tbl in tables)
 		foreach (ForeignKey addKey in addFKeyList)
 		{
 		#>
-           Create.<# 
+            Create.<# 
     if(!string.IsNullOrEmpty(addKey.Name)) 
     { 
         #>ForeignKey("<#=addKey.Name#>")<# 
     } #>.FromTable("<#=tbl.Name#>").InSchema("<#=addKey.ForeignTableSchema#>").ForeignColumns(<#=Join(addKey.ForeignColumns)#>).ToTable("<#=addKey.PrimaryTable#>").InSchema("<#=addKey.PrimaryTableSchema#>").PrimaryColumns(<#=Join(addKey.PrimaryColumns)#>)<#=generator.GetUpdateDeleteRule(addKey)#>;
-        <#
+<#
 		}
 	}
     foreach(ForeignKey fkey in FKeyList)
