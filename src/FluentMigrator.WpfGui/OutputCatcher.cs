@@ -19,39 +19,39 @@ namespace FluentMigrator.WpfGui
 
         public void Heading(string message)
         {
-            _totalOutput.Append(message);
+            _totalOutput.AppendLine(message);
         }
 
         public void Say(string message)
         {
             if (message == "Task completed." || message.StartsWith("Using Database"))
                 return;
-            _totalOutput.Append(message);
+            _totalOutput.AppendLine(message);
         }
 
         public void Emphasize(string message)
         {
-            _totalOutput.Append(message);
+            _totalOutput.AppendLine(message);
         }
 
         public void Sql(string sql)
         {
-            _totalOutput.Append(sql);
+            _totalOutput.AppendLine(sql);
         }
 
         public void ElapsedTime(TimeSpan timeSpan)
         {
-            _totalOutput.Append(timeSpan);
+            _totalOutput.AppendLine(timeSpan.ToString());
         }
 
         public void Error(string message)
         {
-            _totalOutput.Append(message);
+            _totalOutput.AppendLine(message);
         }
 
         public void Write(string message, bool escaped)
         {
-            _totalOutput.Append(message);
+            _totalOutput.AppendLine(message);
         }
     }
 }
