@@ -4,6 +4,7 @@ using System.ComponentModel;
 using System.Data.SqlClient;
 using System.Linq;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
@@ -15,6 +16,7 @@ using System.Windows.Navigation;
 using System.Windows.Shapes;
 using FluentMigrator.Runner;
 using FluentMigrator.Runner.Initialization;
+using Microsoft.Win32;
 
 namespace FluentMigrator.WpfGui
 {
@@ -34,26 +36,58 @@ namespace FluentMigrator.WpfGui
             ServerName = "(local)\\SQLEXPRESS";
             DbName = "SalusUAT";
             CurrentVersion = "(No Connection)";
+            MigrationFilePath = String.Empty;
+            _dbConnectionIsGood = false;
+            _migrateFileIsGood = false;
         }
 
         public string ServerName { get; set; }
         public string DbName { get; set; }
         public string CurrentVersion { get; set; }
+        public string MigrationFilePath { get; set; }
+        public IEnumerable<Version> MigrationVersionList { get; set; }
+        public Boolean CanMigrate { get { return _dbConnectionIsGood && _migrateFileIsGood; } }
+
+        private Boolean _dbConnectionIsGood, _migrateFileIsGood;
 
         private void ConnectButtonClicked(object sender, RoutedEventArgs e)
         {
             string newVersion = "(No Connection)";
+            _dbConnectionIsGood = false;
             try
             {
                 long versionReturned;
                 if (long.TryParse(ExecuteTask("showlatest"), out versionReturned))
+                {
                     newVersion = GetVersionFromMigrationCode(versionReturned).ToString();
+                    _dbConnectionIsGood = true;
+                }
             }
             catch (SqlException) //do nothing if the database connection fails
             {}
             
             CurrentVersion = newVersion;
             NotifyPropertyChanged("CurrentVersion");
+            NotifyPropertyChanged("CanMigrate");
+        }
+
+        private void SelectFileButtonClicked(object sender, RoutedEventArgs e)
+        {
+            _migrateFileIsGood = false;
+            var openFileDialog = new OpenFileDialog();
+            openFileDialog.DefaultExt = ".dll";
+            openFileDialog.Filter = "Migration Libraries (.dll)|*.dll";
+            bool? openResult = openFileDialog.ShowDialog();
+
+            if (openResult != true) return;
+
+            MigrationFilePath = openFileDialog.FileName;
+            NotifyPropertyChanged("MigrationFilePath");
+
+            MigrationVersionList = InterpretVersionList(ExecuteTask("listmigrations"));
+            _migrateFileIsGood = MigrationVersionList.Any();
+            NotifyPropertyChanged("MigrationVersionList");
+            NotifyPropertyChanged("CanMigrate");
         }
 
         private string ExecuteTask(string task)
@@ -69,7 +103,7 @@ namespace FluentMigrator.WpfGui
             {
                 Database = "SqlServer2008",
                 Connection = GetConnectionString(),
-                Target = "",//path to the assembly holding the migrations
+                Target = MigrationFilePath,//path to the assembly holding the migrations
                 Task = task,//"migrate:newer",
                 Version = 0//version to migrate to as long
             };
@@ -96,6 +130,25 @@ namespace FluentMigrator.WpfGui
         {
             var handler = PropertyChanged;
             if (handler != null) handler(this, new PropertyChangedEventArgs(propertyName));
+        }
+
+        private IEnumerable<Version> InterpretVersionList(string versionListString)
+        {
+            var matcher = new Regex("\\d+");
+            return versionListString
+                .Split(new[] { "\n", "\r" }, StringSplitOptions.RemoveEmptyEntries)
+                .Select(s => matcher.Match(s))
+                .Where(m => m.Success)
+                .Select(m => GetVersionFromMigrationCode(long.Parse(m.Value)));
+        }
+
+        private void MigrateToLatestClicked(object sender, RoutedEventArgs e)
+        {
+            
+        }
+
+        private void MigrateToSelectedClicked(object sender, RoutedEventArgs e)
+        {
         }
     }
 }
