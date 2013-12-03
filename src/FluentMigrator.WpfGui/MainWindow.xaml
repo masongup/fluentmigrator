@@ -36,8 +36,8 @@
         </GroupBox>
         <GroupBox Header="Apply Migrations">
             <StackPanel>
-                <Button Content="Migrate DB To Latest" Click="MigrateToLatestClicked" Height="50" Margin="4" IsEnabled="{Binding CanMigrate}"/>
-                <Button Content="Migrate DB To Selected" Click="MigrateToSelectedClicked" Height="50" Margin="4" IsEnabled="{Binding CanMigrate}" />
+                <Button Content="Migrate DB To Latest" Name="MigrateToLatestButton" Click="MigrateToLatestClicked" Height="50" Margin="4" IsEnabled="False"/>
+                <Button Content="Migrate DB To Selected" Name="MigrateToSelectedButton" Click="MigrateToSelectedClicked" Height="50" Margin="4" IsEnabled="False" />
             </StackPanel>
         </GroupBox>
         <GroupBox Header="Results">

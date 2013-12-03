@@ -46,7 +46,6 @@ namespace FluentMigrator.WpfGui
         public string CurrentVersion { get; set; }
         public string MigrationFilePath { get; set; }
         public IEnumerable<Version> MigrationVersionList { get; set; }
-        public Boolean CanMigrate { get { return _dbConnectionIsGood && _migrateFileIsGood; } }
 
         private Boolean _dbConnectionIsGood, _migrateFileIsGood;
 
@@ -68,7 +67,7 @@ namespace FluentMigrator.WpfGui
             
             CurrentVersion = newVersion;
             NotifyPropertyChanged("CurrentVersion");
-            NotifyPropertyChanged("CanMigrate");
+            ResetButtonStatus();
         }
 
         private void SelectFileButtonClicked(object sender, RoutedEventArgs e)
@@ -87,10 +86,24 @@ namespace FluentMigrator.WpfGui
             MigrationVersionList = InterpretVersionList(ExecuteTask("listmigrations"));
             _migrateFileIsGood = MigrationVersionList.Any();
             NotifyPropertyChanged("MigrationVersionList");
-            NotifyPropertyChanged("CanMigrate");
+            ResetButtonStatus();
         }
 
-        private string ExecuteTask(string task)
+        private void ResetButtonStatus()
+        {
+            if (_dbConnectionIsGood && _migrateFileIsGood)
+            {
+                MigrateToSelectedButton.IsEnabled = true;
+                MigrateToLatestButton.IsEnabled = MigrationVersionList.First().ToString() != CurrentVersion;
+            }
+            else
+            {
+                MigrateToLatestButton.IsEnabled = false;
+                MigrateToSelectedButton.IsEnabled = false;
+            }
+        }
+
+        private string ExecuteTask(string task, long version = 0)
         {
             var catcher = new OutputCatcher();
             new TaskExecutor(GetRunnerContext(catcher, task)).Execute();
