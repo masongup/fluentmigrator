@@ -8,7 +8,7 @@ namespace FluentMigrator.WpfGui
 {
     public class OutputCatcher : IAnnouncer
     {
-        private StringBuilder _totalOutput;
+        private readonly StringBuilder _totalOutput;
 
         public OutputCatcher()
         {
@@ -36,12 +36,10 @@ namespace FluentMigrator.WpfGui
 
         public void Sql(string sql)
         {
-            _totalOutput.AppendLine(sql);
         }
 
         public void ElapsedTime(TimeSpan timeSpan)
         {
-            _totalOutput.AppendLine(timeSpan.ToString());
         }
 
         public void Error(string message)

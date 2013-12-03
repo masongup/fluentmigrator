@@ -106,11 +106,11 @@ namespace FluentMigrator.WpfGui
         private string ExecuteTask(string task, long version = 0)
         {
             var catcher = new OutputCatcher();
-            new TaskExecutor(GetRunnerContext(catcher, task)).Execute();
+            new TaskExecutor(GetRunnerContext(catcher, task, version)).Execute();
             return catcher.Output;
         }
 
-        private RunnerContext GetRunnerContext(IAnnouncer announcer, string task)
+        private RunnerContext GetRunnerContext(IAnnouncer announcer, string task, long version)
         {
             return new RunnerContext(announcer)//expects to get an IAnnouncer to say what the results of the commands are
             {
@@ -118,7 +118,7 @@ namespace FluentMigrator.WpfGui
                 Connection = GetConnectionString(),
                 Target = MigrationFilePath,//path to the assembly holding the migrations
                 Task = task,//"migrate:newer",
-                Version = 0//version to migrate to as long
+                Version = version//version to migrate to as long
             };
         }
 
@@ -152,6 +152,27 @@ namespace FluentMigrator.WpfGui
             return new Version(major, minor, build, rev);
         }
 
+        private long GetMigrationCode(string inputVersionString)
+        {
+            var inputVersion = new Version(inputVersionString);
+            if (inputVersion.Revision > UInt16.MaxValue || inputVersion.Build > UInt16.MaxValue ||
+                inputVersion.Minor > UInt16.MaxValue || inputVersion.Major > UInt16.MaxValue)
+                throw new Exception("One of the version numbers is greater than the maximum allowed value of " +
+                                    UInt16.MaxValue);
+
+            var revBytes = BitConverter.GetBytes(inputVersion.Revision);
+            var buildBytes = BitConverter.GetBytes(inputVersion.Build);
+            var minorBytes = BitConverter.GetBytes(inputVersion.Minor);
+            var majorBytes = BitConverter.GetBytes(inputVersion.Major);
+            var resultBytes = new[]
+            {
+                revBytes[0], revBytes[1], buildBytes[0], buildBytes[1], minorBytes[0], minorBytes[1], majorBytes[0],
+                majorBytes[1]
+            };
+            long result = BitConverter.ToInt64(resultBytes, 0);
+            return result;
+        }
+
         public event PropertyChangedEventHandler PropertyChanged;
 
         protected virtual void NotifyPropertyChanged(string propertyName)
@@ -162,11 +183,31 @@ namespace FluentMigrator.WpfGui
 
         private void MigrateToLatestClicked(object sender, RoutedEventArgs e)
         {
-            
+            try
+            {
+                ResultTextBox.Text = ExecuteTask("migrate:newer");
+            }
+            catch (Exception ex)
+            {
+                ResultTextBox.Text = "Command execution failed!\n" + ex;
+            }
+            ConnectButtonClicked(null, new RoutedEventArgs());
         }
 
         private void MigrateToSelectedClicked(object sender, RoutedEventArgs e)
         {
+            long migrateTo = GetMigrationCode(MigrationList.SelectedItem.ToString());
+            long migrateFrom = GetMigrationCode(CurrentVersion);
+            string migrateTask = migrateTo > migrateFrom ? "migrate:newer" : "rollback:toversion";
+            try
+            {
+                ResultTextBox.Text = ExecuteTask(migrateTask, migrateTo);
+            }
+            catch (Exception ex)
+            {
+                ResultTextBox.Text = "Command execution failed!\n" + ex;
+            }
+            ConnectButtonClicked(null, new RoutedEventArgs());
         }
     }
 }
