@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.Data.SqlClient;
 using System.Linq;
+using System.Reflection;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Windows;
@@ -14,6 +15,7 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Navigation;
 using System.Windows.Shapes;
+using FluentMigrator;
 using FluentMigrator.Runner;
 using FluentMigrator.Runner.Initialization;
 using Microsoft.Win32;
@@ -73,9 +75,7 @@ namespace FluentMigrator.WpfGui
         private void SelectFileButtonClicked(object sender, RoutedEventArgs e)
         {
             _migrateFileIsGood = false;
-            var openFileDialog = new OpenFileDialog();
-            openFileDialog.DefaultExt = ".dll";
-            openFileDialog.Filter = "Migration Libraries (.dll)|*.dll";
+            var openFileDialog = new OpenFileDialog {DefaultExt = ".dll", Filter = "Migration Libraries (.dll)|*.dll"};
             bool? openResult = openFileDialog.ShowDialog();
 
             if (openResult != true) return;
@@ -83,7 +83,7 @@ namespace FluentMigrator.WpfGui
             MigrationFilePath = openFileDialog.FileName;
             NotifyPropertyChanged("MigrationFilePath");
 
-            MigrationVersionList = InterpretVersionList(ExecuteTask("listmigrations"));
+            MigrationVersionList = GetVersionListWithReflection();
             _migrateFileIsGood = MigrationVersionList.Any();
             NotifyPropertyChanged("MigrationVersionList");
             ResetButtonStatus();
@@ -127,6 +127,21 @@ namespace FluentMigrator.WpfGui
             return "Data Source=" + ServerName + ";Initial Catalog=" + DbName + ";Integrated Security=SSPI;MultipleActiveResultSets=True";
         }
 
+        private IEnumerable<Version> GetVersionListWithReflection()
+        {
+            return Assembly
+                .LoadFile(MigrationFilePath)
+                .GetTypes()
+                .Where(t => t.IsSubclassOf(typeof(Migration)))
+                .Select(t => t.GetCustomAttributes(typeof(MigrationAttribute), false)
+                    .OfType<MigrationAttribute>()
+                    .Single())
+                .Select(ma => ma.Version)
+                .Select(GetVersionFromMigrationCode)
+                .OrderByDescending(v => v)
+                .ToArray();
+        }
+
         private Version GetVersionFromMigrationCode(long inputCode)
         {
             var inputBytes = BitConverter.GetBytes(inputCode);
@@ -143,16 +158,6 @@ namespace FluentMigrator.WpfGui
         {
             var handler = PropertyChanged;
             if (handler != null) handler(this, new PropertyChangedEventArgs(propertyName));
-        }
-
-        private IEnumerable<Version> InterpretVersionList(string versionListString)
-        {
-            var matcher = new Regex("\\d+");
-            return versionListString
-                .Split(new[] { "\n", "\r" }, StringSplitOptions.RemoveEmptyEntries)
-                .Select(s => matcher.Match(s))
-                .Where(m => m.Success)
-                .Select(m => GetVersionFromMigrationCode(long.Parse(m.Value)));
         }
 
         private void MigrateToLatestClicked(object sender, RoutedEventArgs e)
