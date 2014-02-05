@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+using System.Data;
 using System.Linq;
 using System.Reflection;
 using FluentMigrator.Expressions;
@@ -239,6 +241,36 @@ namespace FluentMigrator.Tests.Unit
             loader.LoadVersionInfo();
 
             runner.Verify(r => r.Up(loader.VersionDescriptionMigration), Times.Once());
+        }
+
+        [Test]
+        public void VersionLoaderFindsVersionColumnEvenIfNotFirstColumn()
+        {
+            var conventions = new MigrationConventions();
+            var processor = new Mock<IMigrationProcessor>();
+            var runner = new Mock<IMigrationRunner>();
+            var asm = Assembly.GetExecutingAssembly();
+
+            var testDataSet = new DataSet();
+            var testTable = new DataTable();
+            var testBlockColumn = new DataColumn("id");
+            var testVersionColumn = new DataColumn(TestVersionTableMetaData.COLUMNNAME);
+            testDataSet.Tables.Add(testTable);
+            testTable.Columns.Add(testBlockColumn);
+            testTable.Columns.Add(testVersionColumn);
+            var testRow = testTable.NewRow();
+            testRow[testBlockColumn] = 1;
+            testRow[testVersionColumn] = 2;
+            testTable.Rows.Add(testRow);
+
+            runner.SetupGet(r => r.Processor).Returns(processor.Object);
+
+            processor.Setup(p => p.TableExists(new TestVersionTableMetaData().SchemaName, TestVersionTableMetaData.TABLENAME)).Returns(true);
+            processor.Setup(p => p.ReadTableData(new TestVersionTableMetaData().SchemaName, TestVersionTableMetaData.TABLENAME)).Returns(testDataSet);
+
+            var loader = new VersionLoader(runner.Object, asm, conventions);
+
+            Assert.AreEqual(2, loader.VersionInfo.AppliedMigrations().Single());
         }
     }
 }
